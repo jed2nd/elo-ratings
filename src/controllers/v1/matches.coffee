@@ -28,11 +28,11 @@ module.exports =
     if ctx.req.query?.rebuild
       matches = yield Match.listAll()
       users = yield User.listAll()
-      for u in users
+      for u, i in users
         u.rating = 2000
         u.matches = 0
         u.wins = 0
-        u.ladderPos = users.indexOf(u) + 1
+        u.ladderPos = i + 1
         yield User.update(u)
 
       matches = matches.sort((a,b) -> a.createdAt - b.createdAt)
@@ -106,13 +106,18 @@ calculateMatchData = (body) ->
   if body.p1Wins > body.p2Wins
     p1NewLadderPos = Math.min(p1.ladderPos, p2.ladderPos)
     p2NewLadderPos = Math.max(p1.ladderPos, p2.ladderPos)
-    p1.ladderPos = p1NewLadderPos
-    p2.ladderPos = p2NewLadderPos
   else if body.p2Wins > body.p1Wins
     p2NewLadderPos = Math.min(p1.ladderPos, p2.ladderPos)
     p1NewLadderPos = Math.max(p1.ladderPos, p2.ladderPos)
-    p2.ladderPos = p2NewLadderPos
+
+  if p1NewLadderPos < p1.ladderPos
+    yield slide(p1.ladderPos, p1NewLadderPos)
     p1.ladderPos = p1NewLadderPos
+    p2.ladderPos = p2.ladderPos+1
+  else if p2NewLadderPos < p2.ladderPos
+    yield slide(p2.ladderPos, p2NewLadderPos)
+    p2.ladderPos = p2NewLadderPos
+    p1.ladderPos = p1.ladderPos+1
 
   data.p1RatingAfter = p1NewRating
   data.p2RatingAfter = p2NewRating
@@ -121,3 +126,11 @@ calculateMatchData = (body) ->
   data.p2 = p2
 
   return data
+
+slide = (high, low) ->
+  users = yield User.listAll()
+  for user in users
+    if user.ladderPos >= low && user.ladderPos < high
+      user.ladderPos = user.ladderPos+1
+      yield User.update(user)
+  return

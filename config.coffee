@@ -4,7 +4,7 @@ module.exports =
   workers: 1
   http:
     host: '127.0.0.1'
-    port: 3000
+    port: 3030
   mongo: 'mongodb://localhost:27017/ratings?poolSize=1'
   media:
     # these should all be in the same file system
