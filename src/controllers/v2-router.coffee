@@ -1,8 +1,9 @@
 router = require('koa-route')
-v1 = include('controllers/v1')
+v2 = include('controllers/v2')
+console.log v2
 
 loadAction = (resource, action) ->
-  r = v1[resource]
+  r = v2[resource]
   console.log 'load', resource, action
   if r? then r[action] || invalid else invalid
 
@@ -33,10 +34,10 @@ invalid = (ctx, res) ->
 	yield return
 
 module.exports = (server) ->
-	server.use(router.get("/v1/:resource", list))
-	server.use(router.get("/v1/:resource/:id", show))
-	server.use(router.post("/v1/:resource", create))
-	server.use(router.put("/v1/:resource/:id", update))
-	server.use(router.patch("/v1/:resource/:id", patch))
-	server.use(router.delete("/v1/:resource/:id", destroy))
-	#server.use -> yield invalid(null, @.response)
+	server.use(router.get("/v2/:resource", list))
+	server.use(router.get("/v2/:resource/:id", show))
+	server.use(router.post("/v2/:resource", create))
+	server.use(router.put("/v2/:resource/:id", update))
+	server.use(router.patch("/v2/:resource/:id", patch))
+	server.use(router.delete("/v2/:resource/:id", destroy))
+	server.use -> yield invalid(null, @.response)
