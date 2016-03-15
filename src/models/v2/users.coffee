@@ -5,7 +5,7 @@ util = include('util')
 module.exports =
   create: (context, data) ->
     doc = {
-      name: data.name
+      name: data.name.toLowerCase()
       createdAt: util.now()
     }
     id = yield db.users.insertOne(doc)
@@ -23,9 +23,10 @@ module.exports =
     yield db.users.findById(id)
 
   findByName: (name) ->
-    yield db.users.findByField("name", name)
+    yield db.users.findByField("name", name.toLowerCase())
 
   findOrCreateByName: (name) ->
+    name = name.toLowerCase()
     user = yield db.users.findByField("name", name)
     return user if user?
     id = yield @create({}, {name: name})

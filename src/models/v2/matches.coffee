@@ -4,7 +4,13 @@ util = include('util')
 
 module.exports =
   create: (data) ->
-    doc = { sport: data.sport, type:  data.type, winners: data.winners, losers:  data.losers, createdAt: util.now()}
+    doc = {
+      sport: data.sport.toLowerCase()
+      type:  data.type.toLowerCase()
+      winners: data.winners
+      losers:  data.losers
+      createdAt: util.now()
+    }
 
     id = yield db.matches.insertOne(doc)
     return yield db.matches.findById(id)

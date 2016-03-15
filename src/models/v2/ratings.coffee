@@ -9,7 +9,7 @@ module.exports = Ratings =
     doc = {
       sport: data.sport
       type:  data.type
-      key:   data.key
+      ids:   data.ids
       rating: data.rating
       ladderPos: data.ladderPos
       wins:  data.wins
@@ -21,14 +21,14 @@ module.exports = Ratings =
     return id
 
   findOrCreate: (data) ->
-    existing = yield db.ratings.findByQuery({sport: data.sport, type: data.type, key: data.key})
+    existing = yield db.ratings.findByQuery({sport: data.sport, type: data.type, ids: data.ids})
     if existing?
       return existing
     else
-      console.log "new user rating #{data.key}"
+      console.log "new user rating #{data.ids}"
       ladderPos = yield Ratings.getNextLadderPos(data.sport, data.type)
       console.log ladderPos
-      createdId = yield Ratings.create({sport: data.sport, type: data.type, key: data.key, rating: BASE_ELO, ladderPos: ladderPos, wins: 0, matches: 0})
+      createdId = yield Ratings.create({sport: data.sport, type: data.type, ids: data.ids, rating: BASE_ELO, ladderPos: ladderPos, wins: 0, matches: 0})
       return yield Ratings.findById(createdId)
 
   findById: (id) ->

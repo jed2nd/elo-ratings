@@ -11,25 +11,25 @@ module.exports =
 		res.ok({match})
 
 	create: (ctx, res) ->
-		#valid = verifyMatchesPayload(ctx.body)
+		valid = verifyMatchesPayload(ctx.body)
 		matchData = ctx.body
 
-		#return res.invalid() unless valid
+		return res.invalid() unless valid
 		{wObjs, lObjs} = yield lookupUsers(matchData)
 
 		match = yield Matches.create(matchData)
 		multi = match.winners.length > 1
-		winnersKey = wObjs.map((p) -> p._id).join('|')
-		losersKey  = lObjs.map((p) -> p._id).join('|')
+		winnersIds = wObjs.map((p) -> p._id)
+		losersIds  = lObjs.map((p) -> p._id)
 
 		winnerRating = yield Ratings.findOrCreate({
 			sport: match.sport
 			type: if multi then 'multi' else 'single'
-			key: winnersKey })
+			ids: winnersIds })
 		loserRating = yield Ratings.findOrCreate({
 			sport: match.sport
 			type: if multi then 'multi' else 'single'
-			key: losersKey
+			ids: losersIds
 		})
 
 		if match.type == 'ladder'
@@ -47,12 +47,20 @@ module.exports =
 
 		res.ok({created: true})
 
+verifyMatchesPayload = (data) ->
+	return false unless data.winners?.length > 0
+	return false unless data.losers?.length > 0
+
+	return false unless data.sport? and data.type?
+
+	return true
+
 lookupUsers = (matchData) ->
 	wObjs = []
 	lObjs = []
-	for n in matchData.winners
+	for n in matchData.winners.sort((a,b) -> a > b)
 		wObjs.push yield Users.findOrCreateByName(n)
-	for n in matchData.losers
+	for n in matchData.losers.sort((a,b) -> a > b)
 		lObjs.push yield Users.findOrCreateByName(n)
 
 	return {wObjs, lObjs}
