@@ -2,6 +2,8 @@ db = service('db')
 path = require('path')
 util = include('util')
 
+Users = model('v2/users')
+
 BASE_ELO = 2000
 
 module.exports = Ratings =
@@ -37,8 +39,17 @@ module.exports = Ratings =
   listAll: () ->
     yield db.ratings.toArray({})
 
-  listWithQuery: (query) ->
-    yield db.ratings.toArray(query)
+  listWithQuery: (query, opts) ->
+    ratings = yield db.ratings.toArray(query)
+    return ratings unless opts?.hydrate
+
+    for r in ratings
+      users = []
+      for id in r.ids
+        users.push yield Users.findById(id)
+      r.players = users
+
+    return ratings
 
   getNextLadderPos: (sport, type) ->
     all = yield Ratings.listWithQuery({sport, type})

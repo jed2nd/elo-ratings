@@ -12,17 +12,12 @@ module.exports =
 		if ctx.params.type?
 			query.type = ctx.params.type.toLowerCase()
 
-		ratings = yield Ratings.listWithQuery(query)
+		ratings = yield Ratings.listWithQuery(query, {hydrate: true})
 
 		ret = {}
 
 		users = []
 		for r in ratings
-			users = []
-			console.log r
-			for id in r.ids
-				users.push yield Users.findById(id)
-			r.players = users
 
 			ret[r.type] ?= []
 			ret[r.type].push r
