@@ -17,10 +17,10 @@ module.exports =
 		query = {}
 		query.ids = {'$in': ids}
 
-		if ctx.params.sport?
-			query.sport = ctx.params.sport.toLowerCase()
-		if ctx.params.type?
-			query.type = ctx.params.type.toLowerCase()
+		if ctx.req.query.sport?
+			query.sport = ctx.req.query.sport.toLowerCase()
+		if ctx.req.query.type?
+			query.type = ctx.req.query.type.toLowerCase()
 
 		ratings = yield Ratings.listWithQuery(query)
 		if ratings.length == 1
@@ -31,10 +31,10 @@ module.exports =
 	list: (ctx, res) ->
 		query = {}
 
-		if ctx.params.sport?
-			query.sport = ctx.params.sport.toLowerCase()
-		if ctx.params.type?
-			query.type = ctx.params.type.toLowerCase()
+		if ctx.req.query.sport?
+			query.sport = ctx.req.query.sport.toLowerCase()
+		if ctx.req.query.type?
+			query.type = ctx.req.query.type.toLowerCase()
 
 		ratings = yield Ratings.listWithQuery(query)
 		if ratings.length == 1

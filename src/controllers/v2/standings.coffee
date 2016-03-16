@@ -9,16 +9,16 @@ module.exports =
 
 		query = {sport: id}
 
-		if ctx.params.type?
-			query.type = ctx.params.type.toLowerCase()
+		if ctx.req.query.type?
+			query.type = ctx.req.query.type.toLowerCase()
 
 		ratings = yield Ratings.listWithQuery(query, {hydrate: true})
 
 		ret = {}
+		if ctx.req.query.type?
+			return res.ok(ratings)
 
-		users = []
 		for r in ratings
-
 			ret[r.type] ?= []
 			ret[r.type].push r
 

@@ -18,13 +18,13 @@ module.exports =
 		if ids.length > 1
 			query.type = 'multi'
 			myQuery.type = 'multi'
-		else if ctx.params.type?
-			query.type = ctx.params.type.toLowerCase()
-			myQuery.type = ctx.params.type.toLowerCase()
+		else if ctx.req.query.type?
+			query.type = ctx.req.query.type.toLowerCase()
+			myQuery.type = ctx.req.query.type.toLowerCase()
 
-		if ctx.params.sport?
-			query.sport = ctx.params.sport.toLowerCase()
-			myQuery.sport = ctx.params.sport.toLowerCase()
+		if ctx.req.query.sport?
+			query.sport = ctx.req.query.sport.toLowerCase()
+			myQuery.sport = ctx.req.query.sport.toLowerCase()
 
 		ratings = yield Ratings.listWithQuery(query, {hydrate: true})
 		myRatings = yield Ratings.listWithQuery(myQuery, {hydrate: true})
