@@ -13,7 +13,6 @@ module.export = require('./initializers')
     server.use((next) -> @._context = new Context(@.request, @.response); yield next)
     server.onerror = (err) -> logger.error('server global', err)
     include('controllers/router')(server)
-    include('controllers/v2-router')(server)
 
     server.listen(config.http.port)
     console.log("listening: #{config.http.host}:#{config.http.port}") if config.development

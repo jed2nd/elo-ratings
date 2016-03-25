@@ -2,7 +2,7 @@ db = service('db')
 path = require('path')
 util = include('util')
 
-Users = model('v2/users')
+Users = model('v1/users')
 
 BASE_ELO = 2000
 
@@ -27,9 +27,7 @@ module.exports = Ratings =
     if existing?
       return existing
     else
-      console.log "new user rating #{data.ids}"
       ladderPos = yield Ratings.getNextLadderPos(data.sport, data.type)
-      console.log ladderPos
       createdId = yield Ratings.create({sport: data.sport, type: data.type, ids: data.ids, rating: BASE_ELO, ladderPos: ladderPos, wins: 0, matches: 0})
       return yield Ratings.findById(createdId)
 
@@ -53,7 +51,6 @@ module.exports = Ratings =
 
   getNextLadderPos: (sport, type) ->
     all = yield Ratings.listWithQuery({sport, type})
-    console.log all.map((r) -> r.ladderPos)
     return all.length + 1
 
   update: (updatedDoc) ->

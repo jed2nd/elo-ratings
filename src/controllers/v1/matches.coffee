@@ -1,136 +1,110 @@
-Match = model('v1/match')
-User  = model('v1/user')
-config = require('../../../config')
+Matches  = model('v1/matches')
+Users    = model('v1/users')
+Ratings  = model('v1/ratings')
+config   = include('../config')
 
 module.exports =
 	show: (ctx, res) ->
-		id = ctx.params.id
-
-		match = yield Match.findById(id)
+		match = yield Matches.findById(id)
 		return res.notFound() unless match?
 
-		res.ok(match: match)
+		res.ok({match})
 
 	create: (ctx, res) ->
-    hasAll = ctx.body.p1Wins? and ctx.body.p2Wins?
-    hasAll &&= (ctx.body.p1Id? and ctx.body.p2Id?) or (ctx.body.p1Name? and ctx.body.p2Name?)
-    return res.invalid() unless hasAll
+		valid = verifyMatchesPayload(ctx.body)
+		matchData = ctx.body
 
-    data = yield calculateMatchData(ctx.body)
+		return res.invalid() unless valid
+		{wObjs, lObjs} = yield lookupUsers(matchData)
 
-    p1Saved = yield User.update(data.p1)
-    p2Saved = yield User.update(data.p2)
+		match = yield Matches.create(matchData)
+		multi = match.winners.length > 1
+		winnersIds = wObjs.map((p) -> p._id)
+		losersIds  = lObjs.map((p) -> p._id)
 
-    id = yield Match.create(ctx, data)
-    res.ok(id: id)
+		winnerRating = yield Ratings.findOrCreate({
+			sport: match.sport
+			type: if multi then 'multi' else 'single'
+			ids: winnersIds })
+		loserRating = yield Ratings.findOrCreate({
+			sport: match.sport
+			type: if multi then 'multi' else 'single'
+			ids: losersIds
+		})
 
-  list: (ctx, res) ->
-    if ctx.req.query?.rebuild
-      matches = yield Match.listAll()
-      users = yield User.listAll()
-      for u, i in users
-        u.rating = 2000
-        u.matches = 0
-        u.wins = 0
-        u.ladderPos = i + 1
-        yield User.update(u)
+		if match.type == 'ladder'
+			yield updateLadders(winnerRating, loserRating)
 
-      matches = matches.sort((a,b) -> a.createdAt - b.createdAt)
-      for m in matches
-        body = {}
-        body.p1Id = m.p1Id.toString()
-        body.p2Id = m.p2Id.toString()
+		if match.type in [ 'ladder', 'rated' ]
+			updateRatings(winnerRating, loserRating)
 
-        body.p1Wins = m.p1Wins
-        body.p2Wins = m.p2Wins
+		winnerRating.wins++
+		winnerRating.matches++
+		loserRating.matches++
 
-        data = yield calculateMatchData(body)
+		yield Ratings.update(winnerRating)
+		yield Ratings.update(loserRating)
 
-        yield Match.update(m)
+		res.ok({created: true})
 
-        yield User.update(data.p1)
-        yield User.update(data.p2)
+verifyMatchesPayload = (data) ->
+	return false unless data.winners?.length > 0
+	return false unless data.losers?.length > 0
 
-      res.ok("done")
+	return false unless data.sport? and data.type?
 
-    else
-      res.ok("okay")
+	return true
 
+lookupUsers = (matchData) ->
+	wObjs = []
+	lObjs = []
+	for n in matchData.winners.sort((a,b) -> a > b)
+		wObjs.push yield Users.findOrCreateByName(n)
+	for n in matchData.losers.sort((a,b) -> a > b)
+		lObjs.push yield Users.findOrCreateByName(n)
 
-calculateMatchData = (body) ->
-  if body.p1Id? and body.p2Id?
-    p1 = yield User.findById(body.p1Id)
-    p2 = yield User.findById(body.p2Id)
-  else if body.p1Name? and body.p2Name?
-    p1 = yield User.findOrCreateByName(body.p1Name)
-    p2 = yield User.findOrCreateByName(body.p2Name)
+	return {wObjs, lObjs}
 
-  data = {}
-  data.p1Id = p1._id
-  data.p2Id = p2._id
-  data.p1Wins = body.p1Wins
-  data.p2Wins = body.p2Wins
+updateLadders = (winnerRating, loserRating) ->
+	return if winnerRating.ladderPos < loserRating.ladderPos
 
-  data.p1RatingBefore = p1.rating
-  data.p2RatingBefore = p2.rating
+	query = {
+		sport: winnerRating.sport
+		type:  winnerRating.type
+	}
 
-  p1RatingAdv = p1.rating - p2.rating
-  p2RatingAdv = p2.rating - p1.rating
+	allRatings = yield Ratings.listWithQuery(query)
+	toSlide = allRatings.filter((r) -> r.ladderPos < winnerRating.ladderPos && r.ladderPos > loserRating.ladderPos)
 
-  p1WinExp = 1 / (Math.pow(10, ((0-p1RatingAdv) / 400)) + 1)
-  p2WinExp = 1 / (Math.pow(10, ((0-p2RatingAdv) / 400)) + 1)
+	for r in toSlide
+		r.ladderPos = r.ladderPos + 1
+		resp = yield Ratings.update(r)
 
-  thisK = config.kVal
-  winDiff = Math.abs(body.p1Wins - body.p2Wins)
-  if winDiff == 2
-    thisK *= 1.25
-  else if winDiff == 3
-    thisK *= 1.5
-  else if winDiff > 3
-    frac = 0.5 + (winDiff - 3)/8
-    thisK *= (1 + frac)
+	winnerNewPos = loserRating.ladderPos
+	loserRating.ladderPos = loserRating.ladderPos+1
+	winnerRating.ladderPos = winnerNewPos
+	yield Ratings.update(winnerRating)
+	yield Ratings.update(loserRating)
 
-  p1NewRating = data.p1RatingBefore + (thisK * ((body.p1Wins > body.p2Wins) - p1WinExp))
-  p2NewRating = data.p2RatingBefore + (thisK * ((body.p2Wins > body.p1Wins) - p2WinExp))
+updateRatings = (winnerRating, loserRating) ->
+	wStartRating = winnerRating.rating
+	lStartRating = loserRating.rating
 
-  p1.rating = p1NewRating
-  p2.rating = p2NewRating
+	wAdv = wStartRating - lStartRating
 
-  p1.matches ||= 0
-  p2.matches ||= 0
-  p1.matches++
-  p2.matches++
-  p1.wins += body.p1Wins > body.p2Wins
-  p2.wins += body.p2Wins > body.p1Wins
+	wExp = 1 / (Math.pow(10, ((0-wAdv) / 400)) + 1)
+	lExp = 1 / (Math.pow(10, ((0+wAdv) / 400)) + 1)
 
-  if body.p1Wins > body.p2Wins
-    p1NewLadderPos = Math.min(p1.ladderPos, p2.ladderPos)
-    p2NewLadderPos = Math.max(p1.ladderPos, p2.ladderPos)
-  else if body.p2Wins > body.p1Wins
-    p2NewLadderPos = Math.min(p1.ladderPos, p2.ladderPos)
-    p1NewLadderPos = Math.max(p1.ladderPos, p2.ladderPos)
+	thisK = config.kVal
+	winDiff = Math.abs(winnerRating.wins - loserRating.wins)
 
-  if p1NewLadderPos < p1.ladderPos
-    yield slide(p1.ladderPos, p1NewLadderPos)
-    p1.ladderPos = p1NewLadderPos
-    p2.ladderPos = p2.ladderPos+1
-  else if p2NewLadderPos < p2.ladderPos
-    yield slide(p2.ladderPos, p2NewLadderPos)
-    p2.ladderPos = p2NewLadderPos
-    p1.ladderPos = p1.ladderPos+1
+	if winDiff == 2
+		thisK *= 1.25
+	else if winDiff == 3
+		thisK *= 1.5
+	else if winDiff > 3
+		frac = 0.5 + (winDiff - 3) / 8
+		thisK *= (1+frac)
 
-  data.p1RatingAfter = p1NewRating
-  data.p2RatingAfter = p2NewRating
-
-  data.p1 = p1
-  data.p2 = p2
-
-  return data
-
-slide = (high, low) ->
-  users = yield User.listAll()
-  for user in users
-    if user.ladderPos >= low && user.ladderPos < high
-      user.ladderPos = user.ladderPos+1
-      yield User.update(user)
-  return
+	winnerRating.rating = wStartRating + (thisK * (1 - wExp))
+	loserRating.rating  = lStartRating + (thisK * (0 - lExp))

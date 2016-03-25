@@ -1,5 +1,5 @@
-Ratings = model('v2/ratings')
-Users   = model('v2/users')
+Ratings = model('v1/ratings')
+Users   = model('v1/users')
 config  = include('../config')
 
 module.exports =

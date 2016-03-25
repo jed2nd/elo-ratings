@@ -39,4 +39,4 @@ module.exports = (server) ->
 	server.use(router.put("/v1/:resource/:id", update))
 	server.use(router.patch("/v1/:resource/:id", patch))
 	server.use(router.delete("/v1/:resource/:id", destroy))
-	#server.use -> yield invalid(null, @.response)
+	server.use -> yield invalid(null, @.response)
