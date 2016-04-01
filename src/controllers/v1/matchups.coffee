@@ -20,20 +20,25 @@ module.exports =
   list: (ctx, res) ->
     users = yield User.listAll()
 
+    if ctx.req.query?.hide_retired == 'true'
+      users = users.filter((u) -> !u.retired)
+
     numUsers = users.length
 
     for user in users
       user.rank = numUsers - users.filter((u) -> u.rating < user.rating).length
-      matchups = yield findGoodMatchup(user)
+      matchups = yield findGoodMatchup(user, {hide_retired: ctx.req.query?.hide_retired})
       user.bestMatchup = matchups[0]
 
     users.sort((a,b) -> b.rating - a.rating)
     res.ok(users)
 
-findGoodMatchup = (user) ->
+findGoodMatchup = (user, opts) ->
   allUsers = yield User.listAll()
   allUsers = allUsers.filter((u) ->
-    u._id.toString() != user._id.toString() and u.matches > 3
+    if opts?.hide_retired?
+      return false if u.retired
+    return u._id.toString() != user._id.toString() and u.matches > 3
   )
 
   for u in allUsers when u._id.toString() != user._id.toString()
