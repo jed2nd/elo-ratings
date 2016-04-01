@@ -13,6 +13,7 @@ module.exports =
       p2RatingBefore: data.p2RatingBefore
       p1RatingAfter: data.p1RatingAfter
       p2RatingAfter: data.p2RatingAfter
+      type: data.type
       createdAt: util.now()
     }
 

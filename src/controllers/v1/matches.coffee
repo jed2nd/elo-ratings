@@ -2,16 +2,17 @@ Match = model('v1/match')
 User  = model('v1/user')
 config = require('../../../config')
 
+MAX_CHALLENGE_GAP = 2
+
 module.exports =
-	show: (ctx, res) ->
-		id = ctx.params.id
+  show: (ctx, res) ->
+    id = ctx.params.id
+    match = yield Match.findById(id)
+    return res.notFound() unless match?
+    res.ok(match: match)
 
-		match = yield Match.findById(id)
-		return res.notFound() unless match?
-
-		res.ok(match: match)
-
-	create: (ctx, res) ->
+  create: (ctx, res) ->
+    console.log ctx.body, ctx.body.p1Name
     hasAll = ctx.body.p1Wins? and ctx.body.p2Wins?
     hasAll &&= (ctx.body.p1Id? and ctx.body.p2Id?) or (ctx.body.p1Name? and ctx.body.p2Name?)
     return res.invalid() unless hasAll
@@ -44,6 +45,8 @@ module.exports =
         body.p1Wins = m.p1Wins
         body.p2Wins = m.p2Wins
 
+        body.type   = m.type
+
         data = yield calculateMatchData(body)
 
         yield Match.update(m)
@@ -70,57 +73,70 @@ calculateMatchData = (body) ->
   data.p2Id = p2._id
   data.p1Wins = body.p1Wins
   data.p2Wins = body.p2Wins
+  data.type   = body.type
+
+  # Calculate ratings:
 
   data.p1RatingBefore = p1.rating
   data.p2RatingBefore = p2.rating
 
-  p1RatingAdv = p1.rating - p2.rating
-  p2RatingAdv = p2.rating - p1.rating
+  if !body.type? || body.type in [ 'rated', 'ladder' ]
 
-  p1WinExp = 1 / (Math.pow(10, ((0-p1RatingAdv) / 400)) + 1)
-  p2WinExp = 1 / (Math.pow(10, ((0-p2RatingAdv) / 400)) + 1)
+    p1RatingAdv = p1.rating - p2.rating
+    p2RatingAdv = p2.rating - p1.rating
 
-  thisK = config.kVal
-  winDiff = Math.abs(body.p1Wins - body.p2Wins)
-  if winDiff == 2
-    thisK *= 1.25
-  else if winDiff == 3
-    thisK *= 1.5
-  else if winDiff > 3
-    frac = 0.5 + (winDiff - 3)/8
-    thisK *= (1 + frac)
+    p1WinExp = 1 / (Math.pow(10, ((0-p1RatingAdv) / 400)) + 1)
+    p2WinExp = 1 / (Math.pow(10, ((0-p2RatingAdv) / 400)) + 1)
 
-  p1NewRating = data.p1RatingBefore + (thisK * ((body.p1Wins > body.p2Wins) - p1WinExp))
-  p2NewRating = data.p2RatingBefore + (thisK * ((body.p2Wins > body.p1Wins) - p2WinExp))
+    thisK = config.kVal
+    winDiff = Math.abs(body.p1Wins - body.p2Wins)
+    if winDiff == 2
+      thisK *= 1.25
+    else if winDiff == 3
+      thisK *= 1.5
+    else if winDiff > 3
+      frac = 0.5 + (winDiff - 3)/8
+      thisK *= (1 + frac)
 
-  p1.rating = p1NewRating
-  p2.rating = p2NewRating
+    p1NewRating = data.p1RatingBefore + (thisK * ((body.p1Wins > body.p2Wins) - p1WinExp))
+    p2NewRating = data.p2RatingBefore + (thisK * ((body.p2Wins > body.p1Wins) - p2WinExp))
 
-  p1.matches ||= 0
-  p2.matches ||= 0
-  p1.matches++
-  p2.matches++
-  p1.wins += body.p1Wins > body.p2Wins
-  p2.wins += body.p2Wins > body.p1Wins
+    p1.rating = p1NewRating
+    p2.rating = p2NewRating
 
-  if body.p1Wins > body.p2Wins
-    p1NewLadderPos = Math.min(p1.ladderPos, p2.ladderPos)
-    p2NewLadderPos = Math.max(p1.ladderPos, p2.ladderPos)
-  else if body.p2Wins > body.p1Wins
-    p2NewLadderPos = Math.min(p1.ladderPos, p2.ladderPos)
-    p1NewLadderPos = Math.max(p1.ladderPos, p2.ladderPos)
+  data.p1RatingAfter = p1.rating
+  data.p2RatingAfter = p2.rating
 
-  if p1NewLadderPos < p1.ladderPos
-    yield slide(p1.ladderPos, p1NewLadderPos)
-    p1.ladderPos = p1NewLadderPos
-    p2.ladderPos = p2.ladderPos+1
-  else if p2NewLadderPos < p2.ladderPos
-    yield slide(p2.ladderPos, p2NewLadderPos)
-    p2.ladderPos = p2NewLadderPos
-    p1.ladderPos = p1.ladderPos+1
+  # Calculate Ladder:
 
-  data.p1RatingAfter = p1NewRating
-  data.p2RatingAfter = p2NewRating
+  if !body.type? || body.type in [ 'ladder' ]
+
+    if body.p1Wins > body.p2Wins
+      p1NewLadderPos = Math.min(p1.ladderPos, p2.ladderPos)
+      p2NewLadderPos = Math.max(p1.ladderPos, p2.ladderPos)
+    else if body.p2Wins > body.p1Wins
+      p2NewLadderPos = Math.min(p1.ladderPos, p2.ladderPos)
+      p1NewLadderPos = Math.max(p1.ladderPos, p2.ladderPos)
+
+    if p1NewLadderPos < p1.ladderPos #and (p1.ladderPos - p1NewLadderPos) <= MAX_CHALLENGE_GAP
+      yield slide(p1.ladderPos, p1NewLadderPos)
+      p1.ladderPos = p1NewLadderPos
+      p2.ladderPos = p2.ladderPos+1
+    else if p2NewLadderPos < p2.ladderPos #and (p2.ladderPos - p2NewLadderPos) <= MAX_CHALLENGE_GAP
+      yield slide(p2.ladderPos, p2NewLadderPos)
+      p2.ladderPos = p2NewLadderPos
+      p1.ladderPos = p1.ladderPos+1
+
+  # Update match count:
+
+  if !body.type? || body.type in [ 'rated', 'ladder' ]
+
+    p1.matches ||= 0
+    p2.matches ||= 0
+    p1.matches++
+    p2.matches++
+    p1.wins += body.p1Wins > body.p2Wins
+    p2.wins += body.p2Wins > body.p1Wins
 
   data.p1 = p1
   data.p2 = p2
