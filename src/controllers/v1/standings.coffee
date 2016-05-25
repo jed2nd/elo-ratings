@@ -8,6 +8,7 @@ module.exports =
 		return res.invalid() unless id?
 
 		query = {sport: id}
+		query.retired = {'$exists': false}
 
 		if ctx.req.query.type?
 			query.type = ctx.req.query.type.toLowerCase()

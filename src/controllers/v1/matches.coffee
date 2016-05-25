@@ -96,15 +96,6 @@ updateRatings = (winnerRating, loserRating) ->
 	lExp = 1 / (Math.pow(10, ((0+wAdv) / 400)) + 1)
 
 	thisK = config.kVal
-	winDiff = Math.abs(winnerRating.wins - loserRating.wins)
-
-	if winDiff == 2
-		thisK *= 1.25
-	else if winDiff == 3
-		thisK *= 1.5
-	else if winDiff > 3
-		frac = 0.5 + (winDiff - 3) / 8
-		thisK *= (1+frac)
 
 	winnerRating.rating = wStartRating + (thisK * (1 - wExp))
 	loserRating.rating  = lStartRating + (thisK * (0 - lExp))
