@@ -15,37 +15,54 @@ module.exports =
 		matchData = ctx.body
 
 		return res.invalid() unless valid
-		{wObjs, lObjs} = yield lookupUsers(matchData)
 
 		match = yield Matches.create(matchData)
-		multi = match.winners.length > 1
-		winnersIds = wObjs.map((p) -> p._id)
-		losersIds  = lObjs.map((p) -> p._id)
-
-		winnerRating = yield Ratings.findOrCreate({
-			sport: match.sport
-			type: if multi then 'multi' else 'single'
-			ids: winnersIds })
-		loserRating = yield Ratings.findOrCreate({
-			sport: match.sport
-			type: if multi then 'multi' else 'single'
-			ids: losersIds
-		})
-
-		if match.type == 'ladder'
-			yield updateLadders(winnerRating, loserRating)
-
-		if match.type in [ 'ladder', 'rated' ]
-			updateRatings(winnerRating, loserRating)
-
-		winnerRating.wins++
-		winnerRating.matches++
-		loserRating.matches++
-
-		yield Ratings.update(winnerRating)
-		yield Ratings.update(loserRating)
-
+		yield addMatch(match)
 		res.ok({created: true})
+
+	update: (ctx, res) ->
+		return res.invalid() unless ctx.body.recalc
+
+		allMatches = yield Matches.listAll()
+
+		allRatings = yield Ratings.listAll()
+		for r in allRatings
+			yield Ratings.reset(r)
+
+		for m in allMatches
+			yield addMatch(m)
+
+		res.ok({done: true})
+
+addMatch = (match) ->
+	multi = match.winners.length > 1
+	{wObjs, lObjs} = yield lookupUsers(match)
+	winnersIds = wObjs.map((p) -> p._id)
+	losersIds  = lObjs.map((p) -> p._id)
+
+	winnerRating = yield Ratings.findOrCreate({
+		sport: match.sport
+		type: if multi then 'multi' else 'single'
+		ids: winnersIds })
+	loserRating = yield Ratings.findOrCreate({
+		sport: match.sport
+		type: if multi then 'multi' else 'single'
+		ids: losersIds
+	})
+
+	if match.type == 'ladder'
+		yield updateLadders(winnerRating, loserRating)
+
+	if match.type in [ 'ladder', 'rated' ]
+		updateRatings(winnerRating, loserRating)
+
+	winnerRating.wins++
+	winnerRating.matches++
+	loserRating.matches++
+
+	yield Ratings.update(winnerRating)
+	yield Ratings.update(loserRating)
+	
 
 verifyMatchesPayload = (data) ->
 	return false unless data.winners?.length > 0

@@ -25,6 +25,10 @@ module.exports = Ratings =
   findOrCreate: (data) ->
     existing = yield db.ratings.findByQuery({sport: data.sport, type: data.type, ids: data.ids})
     if existing?
+      if existing.reset
+        existing.reset = false
+        existing.ladderPos = yield Ratings.getNextLadderPos(data.sport, data.type)
+        yield Ratings.update(existing)
       return existing
     else
       ladderPos = yield Ratings.getNextLadderPos(data.sport, data.type)
@@ -50,8 +54,18 @@ module.exports = Ratings =
     return ratings
 
   getNextLadderPos: (sport, type) ->
-    all = yield Ratings.listWithQuery({sport, type})
+    all = yield Ratings.listWithQuery({sport, type, reset: false, retired: {'$exists': false}})
     return all.length + 1
+
+  reset: (doc) ->
+    id = doc._id
+    toSet = {}
+    toSet.rating = BASE_ELO
+    toSet.ladderPos = null
+    toSet.wins = 0
+    toSet.matches = 0
+    toSet.reset = true
+    return db.ratings.updateWithId(id, toSet)
 
   update: (updatedDoc) ->
     id = updatedDoc._id
