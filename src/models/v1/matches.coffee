@@ -3,22 +3,17 @@ path = require('path')
 util = include('util')
 
 module.exports =
-  create: (context, data) ->
+  create: (data) ->
     doc = {
-      p1Id: data.p1Id
-      p2Id: data.p2Id
-      p1Wins: data.p1Wins
-      p2Wins: data.p2Wins
-      p1RatingBefore: data.p1RatingBefore
-      p2RatingBefore: data.p2RatingBefore
-      p1RatingAfter: data.p1RatingAfter
-      p2RatingAfter: data.p2RatingAfter
-      type: data.type
+      sport: data.sport.toLowerCase()
+      type:  data.type.toLowerCase()
+      winners: data.winners
+      losers:  data.losers
       createdAt: util.now()
     }
 
     id = yield db.matches.insertOne(doc)
-    return id
+    return yield db.matches.findById(id)
 
   findById: (id) ->
     yield db.matches.findById(id)

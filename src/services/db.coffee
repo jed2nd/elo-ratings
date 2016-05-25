@@ -12,6 +12,7 @@ m = module.exports =
 			m.db = db
 			m.users   = db.collection('users')
 			m.matches = db.collection('matches')
+			m.ratings = db.collection('ratings')
 			null
 
 mongodb.Collection.prototype.insertOne = (doc) ->
@@ -28,6 +29,9 @@ mongodb.Collection.prototype.findById = (id) ->
 	object = yield cursor.limit(1).nextObjectAsync()
 	cursor.close()
 	return object
+
+mongodb.Collection.prototype.findByQuery = (query) ->
+	return yield this.findOneAsync(query)
 
 mongodb.Collection.prototype.findByField = (field, value) ->
   query = {}

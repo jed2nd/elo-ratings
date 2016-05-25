@@ -1,5 +1,5 @@
 module.exports =
-  users: require('./users')
-  matches: require('./matches')
-  matchups: require('./matchups')
-  standings: require('./standings')
+	matches:  require './matches'
+	ratings:  require './ratings'
+	matchups: require './matchups'
+	standings: require './standings'

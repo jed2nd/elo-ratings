@@ -1,13 +1,28 @@
-User = model('v1/user')
+Ratings = model('v1/ratings')
+Users   = model('v1/users')
+config  = include('../config')
 
 module.exports =
-  list: (ctx, res) ->
-    users = yield User.listAll()
+	show: (ctx, res) ->
+		id = ctx.params.id.toLowerCase()
+		return res.invalid() unless id?
 
-    numUsers = users.length
+		query = {sport: id}
+		query.retired = {'$exists': false}
 
-    for user in users
-      user.rank = numUsers - users.filter((u) -> u.rating < user.rating).length
+		if ctx.req.query.type?
+			query.type = ctx.req.query.type.toLowerCase()
 
-    users.sort((a,b) -> b.rating - a.rating)
-    res.ok({users: users})
+		ratings = yield Ratings.listWithQuery(query, {hydrate: true})
+
+		ret = {}
+		if ctx.req.query.type?
+			return res.ok(ratings)
+
+		for r in ratings
+			ret[r.type] ?= []
+			ret[r.type].push r
+
+		for type, arr of ret
+			ret[type] = ret[type].sort((a,b) -> a.ladderPos > b.ladderPos)
+		res.ok(ret)
