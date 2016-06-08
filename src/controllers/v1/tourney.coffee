@@ -9,7 +9,18 @@ module.exports =
     { tourneyRecord, tourney } = yield Tourneys.findByField('name', ctx.params.id)
     return res.notFound() unless tourney?
 
-    res.ok({tourneyRecord, tourney})
+    ratings = []
+    for player in tourneyRecord.players
+      r = yield Ratings.listWithQuery({_id: player}, {hydrate: true})
+      ratings.push r[0]
+
+    matches = tourney.matches.filter((m) -> !m.m?).map (m) ->
+      {
+        group: m.id.s
+        players: m.p.map((p) -> ratings[p-1])
+      }
+
+    res.ok({tourneyRecord, tourney, matches})
 
   create: (ctx, res) ->
     valid = verifyTourneyPayload(ctx.body)
@@ -27,7 +38,6 @@ module.exports =
       })
 
     ratings.sort((a,b) -> a.ladderPos - b.ladderPos)
-    console.log ratings
     tourneyData.players = ratings.map((r) -> r._id)
     { tourneyRecord, tourney } = yield Tourneys.create(tourneyData)
     res.ok({tourneyRecord, tourney})
