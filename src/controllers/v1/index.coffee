@@ -3,3 +3,4 @@ module.exports =
 	ratings:  require './ratings'
 	matchups: require './matchups'
 	standings: require './standings'
+	tourneys: require './tourney'

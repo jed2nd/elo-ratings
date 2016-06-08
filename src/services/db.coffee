@@ -13,6 +13,7 @@ m = module.exports =
 			m.users   = db.collection('users')
 			m.matches = db.collection('matches')
 			m.ratings = db.collection('ratings')
+			m.tourneys = db.collection('tourneys')
 			null
 
 mongodb.Collection.prototype.insertOne = (doc) ->
