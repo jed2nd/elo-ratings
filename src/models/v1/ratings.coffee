@@ -27,7 +27,7 @@ module.exports = Ratings =
     if existing?
       if existing.reset
         existing.reset = false
-        existing.ladderPos = yield Ratings.getNextLadderPos(data.sport, data.type)
+        existing.ladderPos = yield Ratings.getNextLadderPos(data.sport, data.type, true)
         yield Ratings.update(existing)
       return existing
     else
@@ -53,9 +53,14 @@ module.exports = Ratings =
 
     return ratings
 
-  getNextLadderPos: (sport, type) ->
-    all = yield Ratings.listWithQuery({sport, type, reset: false, retired: {'$exists': false}})
-    return all.length + 1
+  getNextLadderPos: (sport, type, overrideRetired = false) ->
+    q = { sport, type, reset: false }
+    unless overrideRetired
+      q.retired = {'$exists': false}
+    all = yield Ratings.listWithQuery(q)
+    last = all.sort((a,b) -> a.ladderPos > b.ladderPos)[all.length-1]
+    return 1 unless last?
+    return last.ladderPos + 1
 
   reset: (doc) ->
     id = doc._id
@@ -66,6 +71,15 @@ module.exports = Ratings =
     toSet.matches = 0
     toSet.reset = true
     return db.ratings.updateWithId(id, toSet)
+
+  retire: (doc) ->
+    id = doc._id
+    toSlide = yield Ratings.listWithQuery({ sport: doc.sport, type: doc.type, ladderPos: { '$gt': doc.ladderPos }})
+    for r in toSlide
+      r.ladderPos = r.ladderPos - 1
+      yield Ratings.update(r)
+
+    return db.ratings.updateWithId(id, { retired: true })
 
   update: (updatedDoc) ->
     id = updatedDoc._id

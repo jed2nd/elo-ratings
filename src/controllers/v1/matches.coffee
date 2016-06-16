@@ -26,11 +26,17 @@ module.exports =
 		allMatches = yield Matches.listAll()
 
 		allRatings = yield Ratings.listAll()
+
+		allUsers = yield Users.listAll()
+
 		for r in allRatings
 			yield Ratings.reset(r)
 
 		for m in allMatches
 			yield addMatch(m)
+
+		for r in allRatings when r.retired
+			yield Ratings.retire(r)
 
 		res.ok({done: true})
 
@@ -51,10 +57,10 @@ addMatch = (match) ->
 	})
 
 	if match.type == 'ladder'
-		yield updateLadders(winnerRating, loserRating)
+		match.ladderGain = yield updateLadders(winnerRating, loserRating)
 
 	if match.type in [ 'ladder', 'rated' ]
-		updateRatings(winnerRating, loserRating)
+		match.eloGain = updateRatings(winnerRating, loserRating)
 
 	winnerRating.wins++
 	winnerRating.matches++
@@ -63,6 +69,7 @@ addMatch = (match) ->
 	yield Ratings.update(winnerRating)
 	yield Ratings.update(loserRating)
 	
+	yield Matches.update(match)
 
 verifyMatchesPayload = (data) ->
 	return false unless data.winners?.length > 0
@@ -83,7 +90,7 @@ lookupUsers = (matchData) ->
 	return {wObjs, lObjs}
 
 updateLadders = (winnerRating, loserRating) ->
-	return if winnerRating.ladderPos < loserRating.ladderPos
+	return 0 if winnerRating.ladderPos < loserRating.ladderPos
 
 	query = {
 		sport: winnerRating.sport
@@ -103,6 +110,8 @@ updateLadders = (winnerRating, loserRating) ->
 	yield Ratings.update(winnerRating)
 	yield Ratings.update(loserRating)
 
+	return toSlide.length
+
 updateRatings = (winnerRating, loserRating) ->
 	wStartRating = winnerRating.rating
 	lStartRating = loserRating.rating
@@ -116,3 +125,5 @@ updateRatings = (winnerRating, loserRating) ->
 
 	winnerRating.rating = wStartRating + (thisK * (1 - wExp))
 	loserRating.rating  = lStartRating + (thisK * (0 - lExp))
+
+	return (thisK * (1 - wExp))

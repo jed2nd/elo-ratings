@@ -53,7 +53,10 @@ module.exports = Tourneys =
     tourney = createTourneyFromRecord(tourneyRecord)
 
     playerIds = players.map (p) ->
+      console.log(tourneyRecord.players, p)
       tourneyRecord.players.map((p) -> String(p)).indexOf(String(p)) + 1
+
+    console.log(playerIds)
 
     matches = tourney.matches.filter (m) ->
       console.log(m, playerIds)
@@ -68,7 +71,10 @@ module.exports = Tourneys =
     match = matches[0]
 
     console.log(tourney.state)
-    tourney.score(match.id, score)
+    tourneyScore = new Array(score.length)
+    for p, idx in playerIds
+      tourneyScore[match.p.indexOf(p)] = score[idx]
+    tourney.score(match.id, tourneyScore)
     if tourney.matches.filter((t) -> !t.m?).length == 0
       tourney.stageDone()
       tourney.createNextStage()

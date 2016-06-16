@@ -75,16 +75,6 @@ module.exports =
 		myRating = myRatings[0]
 		if(myRating.retired)
 			return res.ok({done: false})
-		console.log(myRating)
 
-		toSlide = allRatings.filter((r) -> r.ladderPos > myRating.ladderPos)
-		console.log(toSlide)
-
-		for r in toSlide
-			r.ladderPos = r.ladderPos - 1
-			yield Ratings.update(r)
-
-		myRating.retired = true
-		yield Ratings.update(myRating)
-
+		yield Ratings.retire(myRating)
 		res.ok({done: true})

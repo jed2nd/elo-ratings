@@ -9,17 +9,22 @@ module.exports =
       type:  data.type.toLowerCase()
       winners: data.winners
       losers:  data.losers
-      createdAt: util.now()
+      createdAt: data.createdAt || util.now()
+      ladderGain: data.ladderGain
+      eloGain: data.eloGain
     }
 
     id = yield db.matches.insertOne(doc)
     return yield db.matches.findById(id)
 
   findById: (id) ->
-    yield db.matches.findById(id)
+    return yield db.matches.findById(id)
 
   listAll: () ->
-    yield db.matches.toArray({})
+    return yield db.matches.toArray({})
+
+  listWithQuery: (query, opts) ->
+    return yield db.matches.toArray(query)
 
   update: (updatedDoc) ->
     id = updatedDoc._id
